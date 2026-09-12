@@ -3,5 +3,5 @@ services:
     name: flash-recall
     env: python
     plan: free
-    buildCommand: ""
+    buildCommand: pip install -r requirements.txt
     startCommand: python3 app.py --no-browser
