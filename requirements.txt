@@ -1,0 +1,2 @@
+# 该系统完全基于 Python 3 标准库构建，无需安装外部 pip 依赖。
+# 保留此文件用于让云平台 (Render / Zeabur / Railway) 自动识别为 Python 运行环境。

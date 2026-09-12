@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bilingual Flashcards - 智能双语文档提取与默写闪卡</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=2.6">
+  <script>
+    (function() {
+      try {
+        var theme = localStorage.getItem('flashcard-theme');
+        if (theme === 'light' || (!theme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)) {
+          document.documentElement.classList.add('light-theme');
+        }
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="dark-theme">
+  <div class="app-layout">
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+      <div class="nav-brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">FlashRecall</span>
+          <span class="brand-badge">双语默写闪卡</span>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" role="tablist">
+        <button id="tab-dictate" class="tab-btn active" role="tab" aria-selected="true" data-tab="dictate-view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            <path d="M2 2l7.586 7.586"></path>
+            <circle cx="11" cy="11" r="2"></circle>
+          </svg>
+          <span>给中文默写英文</span>
+        </button>
+        <button id="tab-flip" class="tab-btn" role="tab" aria-selected="false" data-tab="flip-view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+            <path d="M12 4v16"></path>
+          </svg>
+          <span>翻卡自测</span>
+        </button>
+        <button id="tab-manage" class="tab-btn" role="tab" aria-selected="false" data-tab="manage-view">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span>闪卡库管理 (<span id="total-badge">0</span>)</span>
+        </button>
+      </nav>
+
+      <div class="nav-actions">
+        <button id="btn-theme-toggle" class="theme-toggle-btn" title="切换白天/夜间模式" aria-label="切换白天/夜间模式">
+          <svg class="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Panels -->
+    <main class="main-container">
+      
+      <!-- Panel 1: 给中文默写英文 -->
+      <section id="dictate-view" class="tab-panel active">
+        <div class="practice-card-container">
+          <div class="card-meta-bar">
+            <div class="meta-left">
+              <button id="btn-dictate-prev-nav" class="nav-icon-btn" title="上一张卡片 (Alt+←)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+              <button id="btn-dictate-picker" class="card-picker-trigger" title="点击选择或快速跳转词条">
+                <span id="dictate-current-num">1</span> / <span id="dictate-total-num">1</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <button id="btn-dictate-next-nav" class="nav-icon-btn" title="下一张卡片 (Alt+→)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+            <div class="meta-right">
+              <div id="card-status-tag" class="status-pill status-new">
+                <span class="status-indicator-dot"></span>
+                <span id="card-status-text">待练习</span>
+              </div>
+              <button id="btn-sound" class="icon-tool-btn" title="朗读正确英文发音 (Ctrl+S)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Prompt Section (Chinese) -->
+          <div class="prompt-box">
+            <div id="dictate-prompt-zh" class="prompt-chinese">请选择文档开始默写</div>
+            <div id="dictate-hint-text" class="hint-preview hidden"></div>
+          </div>
+
+          <!-- User Input Area -->
+          <div class="input-section">
+            <div class="input-wrapper">
+              <textarea 
+                id="dictate-input" 
+                placeholder="在此键入英文翻译 / 单词 / 句式，按 Enter 提交对比..." 
+                rows="3" 
+                autocomplete="off" 
+                autocorrect="off" 
+                spellcheck="false"></textarea>
+            </div>
+
+            <!-- Hint & Controls Row -->
+            <div class="controls-row">
+              <div class="hints-group">
+                <button id="btn-hint" class="hint-btn" title="查看首字母提示 (Tab)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                  <span>提示 (Tab)</span>
+                </button>
+                <button id="btn-reveal" class="hint-btn" title="查看标准英文答案">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                  <span>显示答案</span>
+                </button>
+              </div>
+
+              <div class="submit-group">
+                <button id="btn-check" class="primary-btn submit-btn">
+                  <span>检查对比 (Enter)</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Result & Comparison Area (Dynamic Diff) -->
+          <div id="result-container" class="result-container hidden">
+            <div class="result-header">
+              <div class="score-container">
+                <span class="score-label">匹配准确度：</span>
+                <span id="score-val" class="score-val">100%</span>
+                <span id="score-badge" class="badge-success">完全吻合</span>
+              </div>
+            </div>
+
+            <!-- Diff Visualizer -->
+            <div class="diff-section">
+              <div class="diff-title">逐词/逐字符对比结果：</div>
+              <div id="diff-output" class="diff-box"></div>
+            </div>
+
+            <!-- Reference Answer -->
+            <div class="reference-section">
+              <div class="reference-title">标准英文对照：</div>
+              <div id="reference-en" class="reference-text"></div>
+            </div>
+
+            <!-- Card Note Section: 放在标准英文对照下面 -->
+            <div class="note-section">
+              <div class="note-header">
+                <div class="note-title">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                  <span>学习笔记：</span>
+                </div>
+                <div class="note-header-right">
+                  <span id="dictate-note-tip" class="note-saved-tip hidden">✓ 笔记已保存</span>
+                </div>
+              </div>
+              <div class="note-input-wrapper">
+                <textarea id="dictate-note-input" class="dictate-note-textarea" rows="2" placeholder="在此记录本卡片的语法难点、替换词、易错点或心得 (Ctrl+Enter 快捷保存)..."></textarea>
+                <div class="note-bottom-bar">
+                  <span class="note-shortcut-hint">快捷键：<kbd>Ctrl</kbd> + <kbd>Enter</kbd> 快速保存</span>
+                  <button id="btn-save-dictate-note" class="btn-save-note" title="保存笔记 (Ctrl+Enter)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                      <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                      <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    <span>保存笔记</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mastery Feedback Row -->
+            <div class="feedback-actions">
+              <button id="btn-prev-card" class="btn-prev-card" title="返回上一张卡片 (Alt+←)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                <span>上一张 (Alt+←)</span>
+              </button>
+              <button id="btn-mark-mastered" class="btn-grade mastered-btn" title="标记为熟练，下次减少出现">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>熟练掌握 (1)</span>
+              </button>
+              <button id="btn-mark-learning" class="btn-grade retry-btn" title="有拼写失误，加入复习轮询">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 4v6h-6"></path>
+                  <path d="M1 20v-6h6"></path>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                <span>需再重练 (2)</span>
+              </button>
+              <button id="btn-next-card" class="primary-btn next-card-btn">
+                <span>下一张卡片 (Enter)</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                  <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Shortcuts Legend -->
+          <footer class="shortcuts-footer">
+            <span class="shortcut-tip"><kbd>Enter</kbd> 提交/下一张</span>
+            <span class="shortcut-tip"><kbd>Alt</kbd> + <kbd>←/→</kbd> 上下翻题</span>
+            <span class="shortcut-tip"><kbd>Tab</kbd> 首字母提示</span>
+            <span class="shortcut-tip"><kbd>Ctrl</kbd> + <kbd>S</kbd> 朗读</span>
+            <span class="shortcut-tip"><kbd>Ctrl</kbd> + <kbd>1</kbd> 掌握</span>
+            <span class="shortcut-tip"><kbd>Ctrl</kbd> + <kbd>2</kbd> 重练</span>
+          </footer>
+        </div>
+      </section>
+
+      <!-- Panel 2: 翻卡自测模式 -->
+      <section id="flip-view" class="tab-panel">
+        <div class="flip-mode-wrapper">
+          <div class="flip-meta-bar">
+            <div class="meta-left">
+              <button id="btn-flip-prev-nav" class="nav-icon-btn" title="上一张卡片 (←)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+              <button id="btn-flip-picker" class="card-picker-trigger" title="点击选择或快速跳转词条">
+                <span id="flip-current-num">1</span> / <span id="flip-total-num">1</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </button>
+              <button id="btn-flip-next-nav" class="nav-icon-btn" title="下一张卡片 (→)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3D Card Scene -->
+          <div class="scene">
+            <div id="flashcard-3d" class="flashcard-3d" title="点击或按空格翻转卡片">
+              <!-- Front Side -->
+              <div class="card-face card-face-front">
+                <div class="face-tag">正面 · 提示</div>
+                <div id="flip-front-content" class="face-content">中文内容</div>
+                <div class="flip-instruct">点击或按 <kbd>Space</kbd> 查看背面答案</div>
+              </div>
+              <!-- Back Side -->
+              <div class="card-face card-face-back">
+                <div class="face-tag">背面 · 对照</div>
+                <div id="flip-back-content" class="face-content">English translation</div>
+                <button id="btn-flip-audio" class="audio-btn-inline" title="播放英文发音">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                  </svg>
+                  <span>播放朗读</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Flip Controls -->
+          <div class="flip-actions">
+            <button id="btn-flip-prev" class="secondary-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+              <span>上一张</span>
+            </button>
+            <button id="btn-flip-trigger" class="primary-btn">
+              <span>翻转卡片 (Space)</span>
+            </button>
+            <button id="btn-flip-next" class="secondary-btn">
+              <span>下一张</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: 闪卡库管理与目录扫描 -->
+      <section id="manage-view" class="tab-panel">
+        <div class="manage-layout">
+          <!-- Directory Scanner Header Card -->
+          <div class="scanner-card">
+            <div class="scanner-header">
+              <div class="scanner-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>文档扫描与提取设置</span>
+              </div>
+              <div class="export-actions">
+                <button id="btn-export-anki" class="secondary-btn small-btn" title="导出为 Anki 格式 TSV 文件">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>导出 Anki (.tsv)</span>
+                </button>
+                <button id="btn-export-json" class="secondary-btn small-btn" title="导出为 JSON 文件备份">
+                  <span>导出 JSON</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="scanner-form">
+              <div class="form-group">
+                <label for="input-target-dir">扫描目标目录或单文件路径（支持 .md / .txt 或文件夹）：</label>
+                <div class="dir-input-row">
+                  <input type="text" id="input-target-dir" value="." placeholder="例如 . 或 notes/9.11.md" />
+                  <button id="btn-choose-file" class="secondary-btn" title="选择单个 Markdown/Txt 文档">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                    <span>浏览选择文件</span>
+                  </button>
+                  <button id="btn-choose-dir" class="secondary-btn" title="直接打开本地目录选择窗口">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span>浏览选择目录</span>
+                  </button>
+                  <button id="btn-do-scan" class="primary-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                    <span>开始提取文档</span>
+                  </button>
+                  <input type="file" id="browser-dir-picker" webkitdirectory directory multiple style="display: none;" />
+                  <input type="file" id="browser-file-picker" accept=".md,.txt" style="display: none;" />
+                </div>
+              </div>
+              <div id="scan-status-info" class="scan-status-text">
+                正在使用当前目录：<code id="current-scan-path">.</code>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter & Search Bar -->
+          <div class="table-toolbar">
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="search-input" placeholder="搜索中文释义或英文单词..." />
+            </div>
+
+            <div class="filter-pills">
+              <button class="filter-pill active" data-filter="all">全部 (<span id="count-all">0</span>)</button>
+              <button class="filter-pill" data-filter="new">待练新卡 (<span id="count-new">0</span>)</button>
+              <button class="filter-pill" data-filter="learning">复习中 (<span id="count-learning">0</span>)</button>
+              <button class="filter-pill" data-filter="mastered">已掌握 (<span id="count-mastered">0</span>)</button>
+              <button id="btn-filter-notes" class="filter-pill filter-notes-btn" title="点击切换：只显示有笔记的卡片">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -1px; margin-right: 4px;">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+                <span>只看有笔记</span> (<span id="count-has-notes">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards Table / Grid -->
+          <div class="table-wrapper">
+            <table class="cards-table">
+              <thead>
+                <tr>
+                  <th width="50">#</th>
+                  <th width="32%">中文释义 (Prompt)</th>
+                  <th width="33%">标准英文 (Answer)</th>
+                  <th width="23%">笔记</th>
+                  <th width="12%">状态与操作</th>
+                </tr>
+              </thead>
+              <tbody id="cards-tbody">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Card Picker Modal / Dropdown -->
+  <div id="card-picker-modal" class="picker-modal-backdrop hidden">
+    <div class="picker-modal-card">
+      <div class="picker-modal-header">
+        <div class="picker-modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>快速选择闪卡词条</span>
+          <span id="picker-total-badge" class="picker-badge">共 0 条</span>
+        </div>
+        <button id="btn-close-picker" class="picker-close-btn" title="关闭 (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="picker-search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="picker-filter-input" placeholder="输入关键字即时搜索，或直接滚动列表点击跳转..." />
+      </div>
+      <div id="picker-list-container" class="picker-list-container">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Note Edit Modal -->
+  <div id="note-modal" class="picker-modal-backdrop hidden">
+    <div class="picker-modal-card note-modal-card">
+      <div class="picker-modal-header">
+        <div class="picker-modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <span>编辑闪卡笔记</span>
+        </div>
+        <button id="btn-close-note-modal" class="picker-close-btn" title="关闭 (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="note-modal-body">
+        <div id="note-modal-card-info" class="note-modal-card-info"></div>
+        <textarea id="note-modal-textarea" class="dictate-note-textarea modal-textarea" rows="4" placeholder="在此记录本卡片的学习笔记、语法难点或记忆线索..."></textarea>
+      </div>
+      <div class="note-modal-footer">
+        <button id="btn-cancel-note-modal" class="btn-cancel">取消</button>
+        <button id="btn-confirm-note-modal" class="primary-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>保存笔记</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.7"></script>
+</body>
+</html>
