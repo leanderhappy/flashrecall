@@ -1310,38 +1310,41 @@ function bindEvents() {
   });
 
   // Management & Scanner Controls
+  // Management & Scanner Controls
   async function handleChooseFolder() {
     try {
-      showToast('正在打开本地文件夹选择窗口...');
+      showToast('正在打开文件夹选择器...');
       const res = await fetch('/api/choose_folder', { method: 'POST' });
       const data = await res.json();
       if (data.path) {
         elements.inputTargetDir.value = data.path;
         showToast(`已选择目录: ${data.path}`);
         await triggerScan(data.path);
-      } else if (data.canceled) {
-        // 用户取消
       } else {
-        if (elements.browserDirPicker) elements.browserDirPicker.click();
+        if (data.is_cloud) {
+          showToast('云端服务器无本地桌面，为您打开文件选择器上传文档');
+        }
+        if (elements.browserFilePicker) elements.browserFilePicker.click();
       }
     } catch (err) {
-      console.warn('Native picker fallback:', err);
-      if (elements.browserDirPicker) elements.browserDirPicker.click();
+      console.warn('Folder picker fallback:', err);
+      if (elements.browserFilePicker) elements.browserFilePicker.click();
     }
   }
 
   async function handleChooseFile() {
     try {
-      showToast('正在打开本地文档选择窗口...');
+      showToast('正在打开文档选择器...');
       const res = await fetch('/api/choose_file', { method: 'POST' });
       const data = await res.json();
       if (data.path) {
         elements.inputTargetDir.value = data.path;
         showToast(`已选择文档: ${data.path}`);
         await triggerScan(data.path);
-      } else if (data.canceled) {
-        // 用户取消
       } else {
+        if (data.is_cloud) {
+          showToast('云端环境：为您打开本地文件选择窗口');
+        }
         if (elements.browserFilePicker) elements.browserFilePicker.click();
       }
     } catch (err) {
@@ -1363,34 +1366,63 @@ function bindEvents() {
     elements.btnNavChooseFile.addEventListener('click', handleChooseFile);
   }
 
-  if (elements.browserDirPicker) {
-    elements.browserDirPicker.addEventListener('change', (e) => {
+  if (elements.browserFilePicker) {
+    elements.browserFilePicker.addEventListener('change', async (e) => {
       if (e.target.files && e.target.files.length > 0) {
-        const firstFile = e.target.files[0];
-        const relPath = firstFile.webkitRelativePath;
-        const topFolder = relPath.split('/')[0];
-        if (topFolder) {
-          elements.inputTargetDir.value = topFolder;
-          triggerScan(topFolder);
+        const file = e.target.files[0];
+        try {
+          showToast(`正在上传并提取文档: ${file.name}...`);
+          const text = await file.text();
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, content: text })
+          });
+          const data = await res.json();
+          if (data.cards) {
+            state.cards = data.cards;
+            state.cards.forEach(card => {
+              const localNote = localStorage.getItem(`fc_note_${card.id}`);
+              if ((!card.note || !card.note.trim()) && localNote) {
+                card.note = localNote;
+              }
+            });
+            state.targetDirectory = data.target_directory || file.name;
+            elements.inputTargetDir.value = state.targetDirectory;
+            elements.currentScanPath.textContent = state.targetDirectory;
+            state.currentIndex = 0;
+            state.flipIndex = 0;
+            saveProgressIndices();
+            applyFiltersAndSearch();
+            renderDictateCard();
+            renderFlipCard();
+            updateStats();
+            showToast(`🎉 提取成功！当前共有 ${state.cards.length} 张闪卡`);
+          } else if (data.error) {
+            showToast(`❌ 提取失败: ${data.error}`);
+          }
+        } catch (err) {
+          console.error('File upload error:', err);
+          showToast('上传并提取文档失败，请检查文件格式');
         }
+        e.target.value = '';
       }
     });
   }
 
-  if (elements.browserFilePicker) {
-    elements.browserFilePicker.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files.length > 0) {
-        const firstFile = e.target.files[0];
-        if (firstFile.name) {
-          elements.inputTargetDir.value = firstFile.name;
-          triggerScan(firstFile.name);
-        }
+  // 绑定预置文档快捷芯片
+  document.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const path = chip.getAttribute('data-path');
+      if (path) {
+        elements.inputTargetDir.value = path;
+        triggerScan(path);
       }
     });
-  }
+  });
 
   elements.btnDoScan.addEventListener('click', () => {
-    const dir = elements.inputTargetDir.value.trim() || '.';
+    const dir = elements.inputTargetDir.value.trim() || 'notes';
     triggerScan(dir);
   });
 

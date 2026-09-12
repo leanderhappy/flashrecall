@@ -110,13 +110,44 @@ def pick_file_native(initial_dir: str = ".") -> Optional[str]:
 
 
 
+def resolve_target_path(path_str: str) -> Path:
+    """智能解析目标路径，支持跨机器迁移与相对路径适配"""
+    if not path_str or path_str.strip() in (".", ""):
+        default_notes = BASE_DIR / "notes"
+        return default_notes.resolve() if default_notes.exists() else BASE_DIR
+
+    p = Path(path_str)
+    # 若本身为有效存在路径，直接使用
+    if p.exists():
+        return p.resolve()
+
+    # 相对项目根目录查找
+    candidate = (BASE_DIR / path_str).resolve()
+    if candidate.exists():
+        return candidate
+
+    # 相对 notes 目录查找
+    candidate_notes = (BASE_DIR / "notes" / path_str).resolve()
+    if candidate_notes.exists():
+        return candidate_notes
+
+    # 若为跨机器绝对路径（如 macOS 绝对路径在 Linux 云端无效），提取文件名尝试在 notes 下匹配
+    name = p.name
+    candidate_file = (BASE_DIR / "notes" / name).resolve()
+    if candidate_file.exists():
+        return candidate_file
+
+    default_notes = BASE_DIR / "notes"
+    return default_notes.resolve() if default_notes.exists() else BASE_DIR
+
+
 class FlashcardManager:
     def __init__(self, target_dir: str = "."):
-        self.target_dir = str(Path(target_dir).resolve())
+        self.target_dir = "notes"
         self.cards = []
-        self.load_or_scan()
+        self.load_or_scan(target_dir)
 
-    def load_or_scan(self):
+    def load_or_scan(self, initial_target: str = "."):
         """加载已保存的卡片库，或首次扫描"""
         saved_cards_map = {}
         if DB_FILE.exists():
@@ -131,20 +162,44 @@ class FlashcardManager:
                         saved_cards = data
                     for c in saved_cards:
                         saved_cards_map[c.get("id")] = c
+                    self.cards = saved_cards
             except Exception as e:
                 print(f"读取数据库失败: {e}")
 
-        # 扫描当前目标目录
-        self.rescan(self.target_dir, saved_cards_map)
+        # 智能解析目标目录
+        target_to_use = initial_target if initial_target != "." else self.target_dir
+        resolved = resolve_target_path(target_to_use)
+        try:
+            self.target_dir = str(resolved.relative_to(BASE_DIR))
+        except ValueError:
+            self.target_dir = str(resolved)
+
+        # 若已有卡片，尝试增量扫描；若扫描失败绝不清空现有卡片
+        if resolved.exists():
+            self.rescan(str(resolved), saved_cards_map)
 
     def rescan(self, new_dir: str, preserved_status_map: dict = None) -> list:
         """重新扫描指定目录并保留已有掌握进度"""
-        self.target_dir = str(Path(new_dir).resolve())
+        resolved = resolve_target_path(new_dir)
+        try:
+            self.target_dir = str(resolved.relative_to(BASE_DIR))
+        except ValueError:
+            self.target_dir = str(resolved)
+
+        if not resolved.exists():
+            print(f"提示: 目标路径不存在 ({resolved})，保留现有卡片库")
+            return self.cards
+
         if preserved_status_map is None:
             preserved_status_map = {c["id"]: c for c in self.cards}
 
-        extractor = BilingualExtractor(self.target_dir)
+        extractor = BilingualExtractor(str(resolved))
         fresh_cards = extractor.extract_all()
+
+        # 容错：如果提取到的新卡片为空，且当前库已有卡片，不强制覆盖清空
+        if not fresh_cards and self.cards:
+            print(f"提示: 从 {resolved} 未提取到有效卡片，保留当前卡片库（{len(self.cards)} 张）")
+            return self.cards
 
         merged_cards = []
         for card in fresh_cards:
@@ -161,6 +216,48 @@ class FlashcardManager:
             merged_cards.append(card)
 
         self.cards = merged_cards
+        self.save_to_db()
+        return self.cards
+
+    def import_text_content(self, filename: str, content: str) -> list:
+        """接收浏览器上传的 Markdown/Txt 文档文本，保存至 notes 目录并提取合并"""
+        notes_dir = BASE_DIR / "notes"
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = Path(filename).name or "uploaded_note.md"
+        if not (safe_name.endswith('.md') or safe_name.endswith('.txt')):
+            safe_name += '.md'
+        file_path = notes_dir / safe_name
+        file_path.write_text(content, encoding='utf-8')
+
+        extractor = BilingualExtractor(str(file_path))
+        new_cards = extractor.extract_all()
+
+        preserved_status_map = {c["id"]: c for c in self.cards}
+        existing_indices = {c["id"]: idx for idx, c in enumerate(self.cards)}
+
+        for card in new_cards:
+            cid = card["id"]
+            if cid in preserved_status_map:
+                old = preserved_status_map[cid]
+                card["status"] = old.get("status", "new")
+                card["review_count"] = old.get("review_count", 0)
+                card["error_count"] = old.get("error_count", 0)
+                card["last_practiced"] = old.get("last_practiced", None)
+                card["note"] = old.get("note", "")
+            else:
+                card["note"] = ""
+
+            if cid in existing_indices:
+                self.cards[existing_indices[cid]] = card
+            else:
+                self.cards.append(card)
+                existing_indices[cid] = len(self.cards) - 1
+
+        try:
+            self.target_dir = str(file_path.relative_to(BASE_DIR))
+        except ValueError:
+            self.target_dir = str(file_path)
+
         self.save_to_db()
         return self.cards
 
@@ -211,7 +308,7 @@ class FlashcardManager:
 
 
 # 全局管理实例
-manager = FlashcardManager()
+manager = FlashcardManager("notes")
 
 
 class FlashcardHTTPHandler(SimpleHTTPRequestHandler):
@@ -310,25 +407,50 @@ class FlashcardHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({"card": updated}, ensure_ascii=False).encode('utf-8'))
             return
 
+        elif parsed.path == '/api/upload':
+            filename = data.get('filename', 'uploaded_note.md')
+            content = data.get('content', '')
+            if not content.strip():
+                self.send_response(400)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "文档内容为空"}, ensure_ascii=False).encode('utf-8'))
+                return
+
+            updated_cards = manager.import_text_content(filename, content)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "target_directory": manager.target_dir,
+                "cards": updated_cards,
+                "filename": filename
+            }, ensure_ascii=False).encode('utf-8'))
+            return
+
         elif parsed.path == '/api/choose_folder':
             chosen = pick_directory_native(manager.target_dir)
+            has_gui = sys.platform == 'darwin' or bool(os.environ.get('DISPLAY'))
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
             self.wfile.write(json.dumps({
                 "path": chosen,
-                "canceled": chosen is None
+                "canceled": chosen is None,
+                "is_cloud": not has_gui
             }, ensure_ascii=False).encode('utf-8'))
             return
 
         elif parsed.path == '/api/choose_file':
             chosen = pick_file_native(manager.target_dir)
+            has_gui = sys.platform == 'darwin' or bool(os.environ.get('DISPLAY'))
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
             self.wfile.write(json.dumps({
                 "path": chosen,
-                "canceled": chosen is None
+                "canceled": chosen is None,
+                "is_cloud": not has_gui
             }, ensure_ascii=False).encode('utf-8'))
             return
 

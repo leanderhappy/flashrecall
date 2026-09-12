@@ -371,34 +371,41 @@
 
             <div class="scanner-form">
               <div class="form-group">
-                <label for="input-target-dir">扫描目标目录或单文件路径（支持 .md / .txt 或文件夹）：</label>
+                <label for="input-target-dir">扫描目标文档路径（支持项目内相对路径，或上传本地文档）：</label>
                 <div class="dir-input-row">
-                  <input type="text" id="input-target-dir" value="." placeholder="例如 . 或 notes/9.11.md" />
-                  <button id="btn-choose-file" class="secondary-btn" title="选择单个 Markdown/Txt 文档">
+                  <input type="text" id="input-target-dir" value="notes" placeholder="例如 notes 或 notes/9.11.md" />
+                  <button id="btn-choose-file" class="secondary-btn" title="选择本地 Markdown/Txt 文档直接上传提取">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
                     </svg>
-                    <span>浏览选择文件</span>
+                    <span>上传本地文档</span>
                   </button>
-                  <button id="btn-choose-dir" class="secondary-btn" title="直接打开本地目录选择窗口">
+                  <button id="btn-choose-dir" class="secondary-btn" title="本地桌面环境打开文件夹">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                     </svg>
-                    <span>浏览选择目录</span>
+                    <span>选择文件夹</span>
                   </button>
                   <button id="btn-do-scan" class="primary-btn">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                     </svg>
-                    <span>开始提取文档</span>
+                    <span>扫描提取</span>
                   </button>
                   <input type="file" id="browser-dir-picker" webkitdirectory directory multiple style="display: none;" />
-                  <input type="file" id="browser-file-picker" accept=".md,.txt" style="display: none;" />
+                  <input type="file" id="browser-file-picker" accept=".md,.txt,.markdown" style="display: none;" />
+                </div>
+                <div class="preset-paths-row">
+                  <span class="preset-label">快速载入云端预置文档：</span>
+                  <button type="button" class="preset-chip" data-path="notes">📚 全部文档库 (notes)</button>
+                  <button type="button" class="preset-chip" data-path="notes/9.11.md">📝 9.11范文 (32卡)</button>
+                  <button type="button" class="preset-chip" data-path="notes/GRE_Issue_4.0_速成指南_路莎范文精析.md">📖 GRE精析范文 (200+卡)</button>
                 </div>
               </div>
               <div id="scan-status-info" class="scan-status-text">
-                正在使用当前目录：<code id="current-scan-path">.</code>
+                当前提取目录/文件：<code id="current-scan-path">notes</code>
               </div>
             </div>
           </div>
